@@ -1,0 +1,72 @@
+---
+title: "Assignment 2"
+author: "Natalia Khoudian"
+date: "2025-04-23"
+output: pdf_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+cohort_data <- read.csv("/Users/claudiagonzalez/Desktop/Data/raw-data/cohort.csv")
+#factor all the categorical variables, #0 reference level for all
+cohort_data$female <- factor(cohort_data$female, levels = c(0, 1))  
+cohort_data$cardiac <- factor(cohort_data$cardiac, levels = c(0, 1)) 
+cohort_data$smoke <- factor(cohort_data$smoke, levels = c(0, 1))  
+cohort_data$age <- as.numeric(as.integer(cohort_data$age)) #changing to numeric vs integer
+summary(cohort_data) #summary statistics for cohort data
+```
+
+```{r}
+model_cohort <- lm(cost ~ cardiac + age + smoke + female, data = cohort_data)
+summary(model_cohort)
+```
+
+```{r}
+#plotting relationship between cardiac event and costs, holding fixed gender, age, and smoking 
+cohort_subset <- data.frame(
+  cardiac = factor(c(0, 1), levels = levels(cohort_data$cardiac)),
+  age     = mean(cohort_data$age),
+  smoke   = factor(0, levels = levels(cohort_data$smoke)),
+  female  = factor(0, levels = levels(cohort_data$female))
+)
+# predicted costs of a cardiac patient vs. non cardiac patient, with average age, male, non-smoker
+cohort_subset$pred_cost <- predict(model_cohort, cohort_subset)
+```
+
+```{r}
+#plot
+ggplot(cohort_subset, aes(x = factor(cardiac, labels = c("No","Yes")), y = pred_cost)) +
+  geom_col(fill = "gray70") +
+  geom_text(aes(label = round(pred_cost,1)), vjust = -0.5) +
+  labs(
+    x = "Cardiac Event",
+    y = "Predicted Cost",
+    title = "Predicted Cost by Cardiac Status from linear model",
+    subtitle = paste0("(at age=", round(mean(cohort_data$age),1),
+                      ", nonsmoker, male)")
+  ) +
+  theme_minimal()
+```
+
+```{r}
+# Plotting residuals
+cohort_data$cardiac <- as.numeric(as.character(cohort_data$cardiac))
+cost_resid    <- resid(model_cohort)
+cardiac_resid <- resid(lm(cardiac ~ age + smoke + female, data = cohort_data))
+
+df_resid <- data.frame(cost_resid, cardiac_resid)
+str(df_resid)
+ggplot(df_resid, aes(x = cardiac_resid, y = cost_resid)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    x     = "Residual cardiac",
+    y     = "Residual cost",
+    title = "Residuals of cost vs. cardiac variable (controlling for age, smoking status, gender)"
+  ) +
+  theme_minimal()
+```
